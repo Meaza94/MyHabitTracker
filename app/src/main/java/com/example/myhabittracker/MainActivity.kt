@@ -1,42 +1,29 @@
 package com.example.myhabittracker
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.ArrowBack  // FIX: Standard ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,18 +34,29 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.myhabittracker.ui.theme.MyHabitTrackerTheme
+import com.kizitonwose.calendar.compose.HorizontalCalendar
+import com.kizitonwose.calendar.compose.rememberCalendarState
+import com.kizitonwose.calendar.core.CalendarDay
+import com.kizitonwose.calendar.core.DayPosition
+import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
+import java.text.SimpleDateFormat
+import java.time.YearMonth
+import java.util.Calendar
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val context = LocalContext.current
+            val configuration = LocalConfiguration.current
             var useDarkTheme by remember {
-                mutableStateOf((context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES)
+                mutableStateOf((configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES)
             }
-            MyHabitTrackerTheme(darkTheme = useDarkTheme) {
+
+            MaterialTheme(
+                colorScheme = if (useDarkTheme) darkColorScheme() else lightColorScheme()
+            ) {
                 MyHabitTrackerApp(
                     darkTheme = useDarkTheme,
                     onThemeToggle = { useDarkTheme = !useDarkTheme }
@@ -68,7 +66,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-data class Checklist(val id: Long, val name: String, var notes: String = "")
+data class Checklist(val id: Long, val name: String, var notes: String = "", var dueTimestamp: Long? = null)
 
 @Composable
 fun MyHabitTrackerApp(darkTheme: Boolean, onThemeToggle: () -> Unit) {
@@ -105,6 +103,9 @@ fun MyHabitTrackerApp(darkTheme: Boolean, onThemeToggle: () -> Unit) {
                 NotesScreen(navController = navController, checklist = checklist)
             }
         }
+        composable("calendar") {
+            CalendarScreen(navController = navController)
+        }
     }
 }
 
@@ -122,15 +123,21 @@ fun HabitListScreen(
 ) {
     var showHabitDialog by remember { mutableStateOf(false) }
     var checklistName by remember { mutableStateOf("") }
+    var selectedTimestamp by remember { mutableStateOf<Long?>(null) }
+
+    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Habit Tracker") },
+                title = { Text("Daily Habits") },
                 actions = {
+                    IconButton(onClick = { navController.navigate("calendar") }) {
+                        Icon(Icons.Filled.DateRange, contentDescription = "Calendar")
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (darkTheme) "Dark Mode" else "Light Mode")
+                        Text(if (darkTheme) "Dark" else "Light")
                         Switch(
                             checked = darkTheme,
                             onCheckedChange = { onThemeToggle() },
@@ -149,22 +156,80 @@ fun HabitListScreen(
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             if (showHabitDialog) {
+                val calendar = Calendar.getInstance()
+                selectedTimestamp?.let { calendar.timeInMillis = it }
+
+                val datePickerDialog = DatePickerDialog(
+                    context,
+                    { _, year, month, dayOfMonth ->
+                        calendar.set(year, month, dayOfMonth)
+                        selectedTimestamp = calendar.timeInMillis
+                    },
+                    calendar.get(Calendar.YEAR),
+                    calendar.get(Calendar.MONTH),
+                    calendar.get(Calendar.DAY_OF_MONTH)
+                )
+
+                val timePickerDialog = TimePickerDialog(
+                    context,
+                    { _, hourOfDay, minute ->
+                        calendar.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                        calendar.set(Calendar.MINUTE, minute)
+                        selectedTimestamp = calendar.timeInMillis
+                    },
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE),
+                    false
+                )
+
                 AlertDialog(
-                    onDismissRequest = { showHabitDialog = false },
+                    onDismissRequest = {
+                        showHabitDialog = false
+                        selectedTimestamp = null
+                    },
                     title = { Text("New Habit") },
                     text = {
-                        TextField(
-                            value = checklistName,
-                            onValueChange = { checklistName = it },
-                            label = { Text("Habit Name") }
-                        )
+                        Column {
+                            TextField(
+                                value = checklistName,
+                                onValueChange = { checklistName = it },
+                                label = { Text("Habit Name") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { datePickerDialog.show() },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Set Date")
+                                }
+                                Button(
+                                    onClick = { timePickerDialog.show() },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Set Time")
+                                }
+                            }
+                            selectedTimestamp?.let {
+                                Text(
+                                    text = "Due: ${formatTimestamp(it)}",
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                        }
                     },
                     confirmButton = {
                         Button(
                             onClick = {
                                 if (checklistName.isNotBlank()) {
-                                    onAddChecklist(Checklist(System.currentTimeMillis(), checklistName))
+                                    onAddChecklist(Checklist(System.currentTimeMillis(), checklistName, dueTimestamp = selectedTimestamp))
                                     checklistName = ""
+                                    selectedTimestamp = null
                                     showHabitDialog = false
                                 }
                             }
@@ -173,7 +238,12 @@ fun HabitListScreen(
                         }
                     },
                     dismissButton = {
-                        Button(onClick = { showHabitDialog = false }) {
+                        Button(
+                            onClick = {
+                                showHabitDialog = false
+                                selectedTimestamp = null
+                            }
+                        ) {
                             Text("Cancel")
                         }
                     }
@@ -226,14 +296,22 @@ fun ChecklistItem(
             checked = isChecked,
             onCheckedChange = { onCheckedChange() }
         )
-        Text(
-            text = checklist.name,
-            modifier = Modifier.padding(start = 8.dp),
-            textDecoration = if (isChecked) TextDecoration.LineThrough else null
-        )
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text(
+                text = checklist.name,
+                textDecoration = if (isChecked) TextDecoration.LineThrough else null
+            )
+            checklist.dueTimestamp?.let {
+                Text(
+                    text = "Due: ${formatTimestamp(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Spacer(modifier = Modifier.weight(1f))
         IconButton(onClick = { onNotesClick(checklist) }) {
-            Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = "Notes")
+            Icon(Icons.Filled.Edit, contentDescription = "Notes")
         }
     }
 }
@@ -243,38 +321,112 @@ fun ChecklistItem(
 fun NotesScreen(navController: NavController, checklist: Checklist) {
     var notes by remember { mutableStateOf(checklist.notes) }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { it ->
-        Column(
-            modifier = Modifier
-                .padding(it)
-                .padding(16.dp)
-        ) {
-            Text("Notes for ${checklist.name}", modifier = Modifier.padding(bottom = 16.dp))
-            TextField(
-                value = notes,
-                onValueChange = { notes = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Notes") }
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Button(
-                onClick = {
-                    checklist.notes = notes
-                    navController.popBackStack()
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(checklist.name) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack, // FIX: Icons.Default.ArrowBack
+                            contentDescription = "Back"
+                        )
+                    }
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Save")
-            }
+                actions = {
+                    TextButton(
+                        onClick = {
+                            checklist.notes = notes
+                            navController.popBackStack()
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                }
+            )
         }
+    ) { innerPadding ->
+        TextField(
+            value = notes,
+            onValueChange = { notes = it },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            placeholder = { Text("Take a note...") },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+            )
+        )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CalendarScreen(navController: NavController) {
+    val currentMonth = remember { YearMonth.now() }
+    val startMonth = remember { currentMonth.minusMonths(100) }
+    val endMonth = remember { currentMonth.plusMonths(100) }
+    val firstDayOfWeek = remember { firstDayOfWeekFromLocale() }
+
+    val state = rememberCalendarState(
+        startMonth = startMonth,
+        endMonth = endMonth,
+        firstVisibleMonth = currentMonth,
+        firstDayOfWeek = firstDayOfWeek
+    )
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("Calendar") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back") // FIX: Icons.Default.ArrowBack
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        HorizontalCalendar(
+            modifier = Modifier.padding(innerPadding),
+            state = state,
+            dayContent = { DayContent(day = it) }
+        )
+    }
+}
+
+@Composable
+fun DayContent(day: CalendarDay) {
+    Box(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .padding(4.dp)
+            .clip(CircleShape)
+            .background(color = if (day.position == DayPosition.MonthDate) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = day.date.dayOfMonth.toString())
+    }
+}
+
+fun formatTimestamp(timestamp: Long): String {
+    val sdf = SimpleDateFormat("MMM dd, yyyy, hh:mm a", Locale.getDefault())
+    return sdf.format(timestamp)
 }
 
 
 @Preview(showBackground = true)
 @Composable
 fun MyHabitTrackerAppPreview() {
-    MyHabitTrackerTheme {
+    MaterialTheme {
         MyHabitTrackerApp(darkTheme = false, onThemeToggle = {})
     }
 }
