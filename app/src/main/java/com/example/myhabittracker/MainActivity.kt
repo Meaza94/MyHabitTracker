@@ -8,15 +8,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack  // FIX: Standard ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +49,7 @@ import com.kizitonwose.calendar.core.DayPosition
 import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
 import java.text.SimpleDateFormat
 import java.time.YearMonth
+import java.time.format.TextStyle
 import java.util.Calendar
 import java.util.Locale
 
@@ -311,7 +320,7 @@ fun ChecklistItem(
         }
         Spacer(modifier = Modifier.weight(1f))
         IconButton(onClick = { onNotesClick(checklist) }) {
-            Icon(Icons.Filled.Edit, contentDescription = "Notes")
+            Icon(Icons.Filled.Notes, contentDescription = "Notes")
         }
     }
 }
@@ -329,7 +338,7 @@ fun NotesScreen(navController: NavController, checklist: Checklist) {
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack, // FIX: Icons.Default.ArrowBack
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -382,14 +391,20 @@ fun CalendarScreen(navController: NavController) {
         firstDayOfWeek = firstDayOfWeek
     )
 
+    val visibleMonth = state.firstVisibleMonth.yearMonth
+    val title = remember(visibleMonth) {
+        val month = visibleMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        "$month ${visibleMonth.year}"
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Calendar") },
+                title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back") // FIX: Icons.Default.ArrowBack
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
